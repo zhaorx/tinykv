@@ -350,6 +350,34 @@ func TestCommitWithoutNewTermEntry2AB(t *testing.T) {
 	}
 }
 
+// TestCommitWithHeartbeat tests leader can send log
+// to follower when it received a heartbeat response
+// which indicate it doesn't have update-to-date log
+func TestCommitWithHeartbeat2AB(t *testing.T) {
+	tt := newNetwork(nil, nil, nil, nil, nil)
+	tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgHup})
+
+	// isolate node 5
+	tt.isolate(5)
+	tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgPropose, Entries: []*pb.Entry{{Data: []byte("some data")}}})
+	tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgPropose, Entries: []*pb.Entry{{Data: []byte("some data")}}})
+
+	sm := tt.peers[5].(*Raft)
+	if sm.RaftLog.committed != 1 {
+		t.Errorf("committed = %d, want %d", sm.RaftLog.committed, 1)
+	}
+
+	// network recovery
+	tt.recover()
+
+	// leader broadcast heartbeeat
+	tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgBeat})
+
+	if sm.RaftLog.committed != 3 {
+		t.Errorf("committed = %d, want %d", sm.RaftLog.committed, 3)
+	}
+}
+
 func TestDuelingCandidates2AB(t *testing.T) {
 	a := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
 	b := newTestRaft(2, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
@@ -1195,6 +1223,7 @@ func TestCommitAfterRemoveNode3A(t *testing.T) {
 		MsgType: pb.MessageType_MsgAppendResponse,
 		From:    2,
 		Index:   ccIndex,
+		Term:    r.Term,
 	})
 	ents := nextEnts(r, s)
 	if len(ents) != 2 {
@@ -1309,7 +1338,7 @@ func TestLeaderTransferAfterSnapshot3A(t *testing.T) {
 	// Transfer leadership to 3 when node 3 is lack of snapshot.
 	nt.send(pb.Message{From: 3, To: 1, MsgType: pb.MessageType_MsgTransferLeader})
 	// Send pb.MessageType_MsgHeartbeatResponse to leader to trigger a snapshot for node 3.
-	nt.send(pb.Message{From: 3, To: 1, MsgType: pb.MessageType_MsgHeartbeatResponse})
+	nt.send(pb.Message{From: 3, To: 1, MsgType: pb.MessageType_MsgHeartbeatResponse, Term: lead.Term})
 
 	checkLeaderTransferState(t, lead, StateFollower, 3)
 }
@@ -1408,10 +1437,10 @@ func checkLeaderTransferState(t *testing.T, r *Raft, state StateType, lead uint6
 // transitioned to StateLeader)
 func TestTransferNonMember3A(t *testing.T) {
 	r := newTestRaft(1, []uint64{2, 3, 4}, 5, 1, NewMemoryStorage())
-	r.Step(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgTimeoutNow})
+	r.Step(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgTimeoutNow, Term: r.Term})
 
-	r.Step(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgRequestVoteResponse})
-	r.Step(pb.Message{From: 3, To: 1, MsgType: pb.MessageType_MsgRequestVoteResponse})
+	r.Step(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgRequestVoteResponse, Term: r.Term})
+	r.Step(pb.Message{From: 3, To: 1, MsgType: pb.MessageType_MsgRequestVoteResponse, Term: r.Term})
 	if r.State != StateFollower {
 		t.Fatalf("state is %s, want StateFollower", r.State)
 	}
