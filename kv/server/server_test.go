@@ -4,12 +4,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/pingcap-incubator/tinykv/kv/config"
 	"github.com/pingcap-incubator/tinykv/kv/storage"
 	"github.com/pingcap-incubator/tinykv/kv/storage/standalone_storage"
 	"github.com/pingcap-incubator/tinykv/kv/util/engine_util"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
-	"github.com/stretchr/testify/assert"
 )
 
 func Set(s *standalone_storage.StandAloneStorage, cf string, key []byte, value []byte) error {
@@ -255,7 +256,7 @@ func TestRawScanAfterRawPut1(t *testing.T) {
 
 	scan := &kvrpcpb.RawScanRequest{
 		StartKey: []byte{1},
-		Limit:    10,
+		Limit:    5,
 		Cf:       cf,
 	}
 
@@ -294,7 +295,7 @@ func TestRawScanAfterRawDelete1(t *testing.T) {
 
 	scan := &kvrpcpb.RawScanRequest{
 		StartKey: []byte{1},
-		Limit:    10,
+		Limit:    3,
 		Cf:       cf,
 	}
 
