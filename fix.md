@@ -1,0 +1,1 @@
+1. server_test.go中TestRawScanAfterRawPut1和TestRawScanAfterRawDelete1的RawScanRequest.Limit值应与expectedKeys切片大小一致
